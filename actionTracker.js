@@ -2,32 +2,45 @@ let _store
 
 export default store => {
     _store = store
-    const actionNames = Object.keys(store._actions)
-    store.state._runningActions = []
-    actionNames.forEach(name => {
-        const oldFunc = store._actions[name][0]
+    store.state._runningActions = new Map()
+    store.state._completedActions = new Set()
+    Object.keys(store._actions).forEach(name => {
+        const func = store._actions[name][0]
         store._actions[name][0] = payload => {
-            const promise = oldFunc(payload)
-            store.state._runningActions.push({ name, promise })
-            promise.finally(() => {
-                const index = store.state._runningActions.findIndex(a => a.name === name)
-                if(index != -1) {
-                    store.state._runningActions.splice(index, 1)
-                }
+            const promise = func(payload).finally(() => {
+                store.state._runningActions.delete(name)
+                store.state._completedActions.add(name)
             })
+            store.state._runningActions.set(name, promise)
             return promise
         }
     })
 }
 
 export const isRunning = actionName => {
-    return !!_store.state._runningActions?.find(action => action.name === actionName)
+    return !!_store.state._runningActions?.has(actionName)
+}
+
+export const isComplete = actionName => {
+    return !!_store.state._completedActions?.has(actionName)
 }
 
 export const doAfter = (actionName, func) => {
-    return _store.state._runningActions?.find(action => action.name === actionName)?.promise?.then(func)
+    return _store.state._runningActions?.get(actionName)?.promise?.then(func)
 }
 
 export const getPromise = actionName => {
-    return _store.state._runningActions?.find(action => action.name === actionName)?.promise
+    return _store.state._runningActions?.get(actionName)?.promise
+}
+
+export const waitOrDo = (actionName, func) => {
+    const promise = _store.state._runningActions?.get(actionName)?.promise
+    if(promise) promise.then(func)
+    else func()
+}
+
+export const runOnce = (actionName, payload) => {
+    if(!_store.state._completedActions?.has(actionName)) {
+        return _store.dispatch(actionName, payload)
+    }
 }
