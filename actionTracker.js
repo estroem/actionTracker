@@ -35,8 +35,8 @@ export default store => {
     })
 }
 
-export const isRunning = actionName => {
-    return !!_store.state.__actionTracker_runningActions?.has(actionName)
+export const isRunning = (...actionNames) => {
+    return actionNames.map(name => !!_store.state.__actionTracker_runningActions?.has(name)).some(x => x)
 }
 
 export const isComplete = actionName => {
